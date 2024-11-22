@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Localização das ONGs em Belo Horizonte</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+    <style>
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        .locate-btn, .clear-route-btn {
+            position: absolute;
+            padding: 10px 20px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 1000;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+        }
+
+        .locate-btn {
+            top: 10px;
+            left: 10px;
+        }
+
+        .clear-route-btn {
+            top: 50px;
+            left: 10px;
+        }
+
+        .locate-btn:hover, .clear-route-btn:hover {
+            background-color: #3367d6;
+        }
+
+        .popup-card {
+            max-width: 300px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .popup-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .popup-card img {
+            width: 100%;
+            height: auto;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .popup-card h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .popup-card p {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .popup-card button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            transition: background-color 0.3s ease;
+        }
+
+        .popup-card button:hover {
+            background-color: #3367d6;
+        }
+    </style>
+</head>
+
+<body>
+    <button class="locate-btn" onclick="locateUser()">Localizar Minha Posição</button>
+    <button class="clear-route-btn" onclick="clearRoute()">Limpar Rota</button>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+
+    <script>
+        var map = L.map('map', {
+            maxZoom: 18,
+            minZoom: 10,
+            zoomControl: false // Desabilita o controle de zoom padrão
+        }).setView([-19.9208, -43.9378], 13);
+        
+        // Adiciona o controle de zoom na parte inferior direita
+        L.control.zoom({
+            position: 'bottomright'
+        }).addTo(map);
+
+        var routeControl;
+        var loadingMessage;
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        var ongs = [
+            {
+                nome: "Casa do Caminho",
+                latlng: [-19.9333, -43.9333],
+                descricao: "ONG que apoia famílias em vulnerabilidade social.",
+                imagem: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQmRbohG_-y8hPl9yl5V5CTP-NYzcRSKDwS-Q&s",
+                cor: "red"
+            },
+            {
+                nome: "Instituto Casa Viva",
+                latlng: [-19.9200, -43.9340],
+                descricao: "Promove inclusão social através de atividades culturais.",
+                imagem: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcScR7-OHpm2VpoaXfxgzhzkfRSc-65bOHmbAA&s",
+                cor: "blue"
+            },
+            {
+                nome: "ONG Cidadania em Ação",
+                latlng: [-19.9350, -43.9150],
+                descricao: "Oferece serviços de assistência social e saúde.",
+                imagem: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ23hZ_iKOD4SNzt7Dqs3GFOM0LluPgX9Wc9A&s",
+                cor: "green"
+            },
+            {
+                nome: "Projeto Acolher",
+                latlng: [-19.9260, -43.9375],
+                descricao: "Apoio a crianças e adolescentes em situação de risco.",
+                imagem: "https://espacocolaborador.economia.go.gov.br/_catalogs/masterpage/EspacoColaborador/assets/images/Projeto-Acolher.png",
+                cor: "orange"
+            }
+        ];
+
+        ongs.forEach(function(ong) {
+            var marker = L.marker(ong.latlng, {
+                icon: L.icon({
+                    iconUrl: `https://cdn-icons-png.flaticon.com/128/2499/2499772.png`, 
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30],
+                    popupAnchor: [0, -30]
+                })
+            }).addTo(map);
+
+            marker.bindPopup(`
+                <div class="popup-card">
+                    <h3>${ong.nome}</h3>
+                    <img src="${ong.imagem}" alt="${ong.nome}" class="popup-image"/>
+                    <p><em>${ong.descricao}</em></p>
+                    <button onclick="setRoute(${ong.latlng[0]}, ${ong.latlng[1]})">Traçar Rota</button>
+                </div>
+            `);
+        });
+
+        function setRoute(destLat, destLng) {
+            if (navigator.geolocation) {
+                loadingMessage = L.popup()
+                    .setLatLng(map.getCenter())
+                    .setContent("Obtendo localização...")
+                    .openOn(map);
+                
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    var userLat = position.coords.latitude;
+                    var userLng = position.coords.longitude;
+                    map.closePopup(loadingMessage);
+
+                    if (routeControl) {
+                        routeControl.setWaypoints([L.latLng(userLat, userLng), L.latLng(destLat, destLng)]);
+                    } else {
+                        routeControl = L.Routing.control({
+                            waypoints: [L.latLng(userLat, userLng), L.latLng(destLat, destLng)],
+                            routeWhileDragging: true
+                        }).addTo(map);
+                    }
+
+                    map.setView([userLat, userLng], 13);
+                }, function() {
+                    alert("Erro ao localizar sua posição.");
+                    map.closePopup(loadingMessage);
+                });
+            } else {
+                alert("Geolocalização não suportada pelo seu navegador.");
+            }
+        }
+
+        function clearRoute() {
+            if (routeControl) {
+                routeControl.spliceWaypoints(0, 2);
+                map.removeControl(routeControl);
+                routeControl = null;
+            }
+        }
+
+        function locateUser() {
+            if (navigator.geolocation) {
+                loadingMessage = L.popup()
+                    .setLatLng(map.getCenter())
+                    .setContent("Obtendo localização...")
+                    .openOn(map);
+                
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    var lat = position.coords.latitude;
+                    var lng = position.coords.longitude;
+                    map.closePopup(loadingMessage);
+
+                    map.setView(new L.LatLng(lat, lng), 15);
+                    L.marker([lat, lng]).addTo(map)
+                        .bindPopup('Você está aqui!')
+                        .openPopup();
+                }, function() {
+                    alert("Erro ao localizar sua posição.");
+                    map.closePopup(loadingMessage);
+                });
+            } else {
+                alert("Geolocalização não suportada pelo seu navegador.");
+            }
+        }
+    </script>
+</body>
+
+</html>
